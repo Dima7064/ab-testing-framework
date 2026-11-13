@@ -1,3 +1,4 @@
+
 """Модуль для расчета размера выборки (Sample Size) и MDE."""
 
 import numpy as np
@@ -11,17 +12,7 @@ def calculate_sample_size(
     alpha: float = 0.05,
     power: float = 0.80
 ) -> dict:
-    """Рассчитывает размер выборки для бинарной метрики (конверсия).
-
-    Args:
-        baseline_rate: Текущая конверсия (например, 0.10 для 10%).
-        mde_relative: Ожидаемый относительный прирост (например, 0.05 для +5%).
-        alpha: Уровень значимости (по умолчанию 0.05).
-        power: Статистическая мощность (по умолчанию 0.80).
-
-    Returns:
-        dict: Размер выборки на группу и общий размер.
-    """
+    """Рассчитывает размер выборки для бинарной метрики (конверсии)."""
     treatment_rate = baseline_rate * (1 + mde_relative)
     effect_size = proportion_effectsize(treatment_rate, baseline_rate)
 
@@ -42,19 +33,10 @@ def calculate_mde(
     alpha: float = 0.05,
     power: float = 0.80
 ) -> dict:
-    """Рассчитывает минимальный детектируемый эффект (MDE) при заданном размере выборки.
-
-    Args:
-        baseline_rate: Текущая конверсия.
-        sample_size_per_group: Количество пользователей в одной группе.
-        alpha: Уровень значимости.
-        power: Статистическая мощность.
-
-    Returns:
-        dict: Абсолютный и относительный MDE.
-    """
+    """Рассчитывает минимальный детектируемый эффект (MDE) при заданном размере выборки."""
     analysis = NormalIndPower()
-    # Находим effect size, который можно детектировать
+    
+    # Находим effect size (Cohen's h), который можно детектировать
     effect_size = analysis.solve_power(
         effect_size=None,
         nobs1=sample_size_per_group,
@@ -62,36 +44,29 @@ def calculate_mde(
         power=power,
         ratio=1.0
     )
+    
+    # Берем модуль (NormalIndPower всегда возвращает положительный эффект)
+    h = abs(effect_size)
 
-    # Переводим effect size обратно в конверсию (приближенно)
-    # Используем формулу Cohen's h: h = 2 * arcsin(sqrt(p1)) - 2 * arcsin(sqrt(p2))
-    # Нам нужно найти p2 (treatment_rate), зная h и p1
-    # Решаем через поиск (так как функция arcsin нелинейна)
-    from scipy.optimize import brentq
-
-    def func(p2):
-        return abs(proportion_effectsize(p2, baseline_rate) - effect_size)
-
-    # Ищем p2 в диапазоне от baseline_rate до 1.0 (если эффект положительный)
-    # или от 0 до baseline_rate (если отрицательный)
-    try:
-        if effect_size > 0:
-            treatment_rate = brentq(func, baseline_rate + 1e-6, 1.0 - 1e-6)
-        else:
-            treatment_rate = brentq(func, 1e-6, baseline_rate - 1e-6)
-    except ValueError:
-        # Если не удалось найти, возвращаем None
-        treatment_rate = None
-
-    if treatment_rate is None:
-        return {"error": "Не удалось рассчитать MDE. Проверьте параметры."}
-
-    mde_absolute = abs(treatment_rate - baseline_rate)
+    # Точная обратная формула для Cohen's h: p2 = sin(arcsin(sqrt(p1)) + h/2)^2
+    # Используем тригонометрию, чтобы избежать ошибок поиска корней
+    arcsin_val = np.arcsin(np.sqrt(baseline_rate))
+    
+    # Считаем верхнюю границу (treatment лучше)
+    p2_upper = np.sin(arcsin_val + h / 2) ** 2
+    # Считаем нижнюю границу (treatment хуже)
+    p2_lower = np.sin(max(0, arcsin_val - h / 2)) ** 2
+    
+    # MDE - это минимальное отклонение от базовой ставки
+    mde_abs_upper = abs(p2_upper - baseline_rate)
+    mde_abs_lower = abs(p2_lower - baseline_rate)
+    
+    mde_absolute = min(mde_abs_upper, mde_abs_lower)
     mde_relative = mde_absolute / baseline_rate
 
     return {
         "mde_absolute": mde_absolute,
         "mde_relative": mde_relative,
         "baseline_rate": baseline_rate,
-        "detectable_treatment_rate": treatment_rate,
+        "detectable_treatment_rate": p2_upper if mde_abs_upper < mde_abs_lower else p2_lower,
     }

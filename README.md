@@ -15,27 +15,45 @@
 
 ## 🚀 Установка
 
+Склонируйте репозиторий и установите зависимости:
+
 ```bash
-git clone https://github.com/ТВОЙ_НИК/ab-testing-framework.git
+git clone https://github.com/Dima7064/ab-testing-framework.git
 cd ab-testing-framework
 python -m venv .venv
-source .venv/bin/activate  # Для Windows: .venv\Scripts\activate
+
+# Для Windows:
+.venv\Scripts\activate
+
+# Для Mac/Linux:
+# source .venv/bin/activate
+
 pip install -r requirements.txt
+```
 
-txt
-💻 Примеры использования (CLI)
-Фреймворк можно использовать прямо из командной строки:
+## 💻 Примеры использования (CLI)
 
-Проверка SRM:
+**Проверка SRM:**
+
+```bash
 python cli.py srm --control 10000 --treatment 10200
+```
 
-Расчет размера выборки:
+**Расчет размера выборки:**
+
+```bash
 python cli.py sample-size --baseline 0.10 --mde 0.05
+```
 
-Анализ конверсии (Z-test):
+**Анализ конверсии (Z-test):**
+
+```bash
 python cli.py analyze --control_conv 1000 --control_total 10000 --treatment_conv 1150 --treatment_total 10000
+```
 
-🧑‍💻 Использование как библиотеки
+## 🧑‍💻 Использование как библиотеки
+
+```python
 from ab_framework.frequentist import analyze_conversion, format_report
 from ab_framework.cuped import apply_cuped
 import pandas as pd
@@ -47,12 +65,16 @@ result = analyze_conversion(
 )
 print(format_report(result))
 
-# 2. Применение CUPED
+# 2. Применение CUPED (Снижение дисперсии)
 df = pd.read_csv("data.csv")
 df_cuped, metrics = apply_cuped(df, pre_metric_col="pre_gmv", post_metric_col="gmv")
+print(f"Снижение дисперсии: {metrics['variance_reduction']:.2%}")
+```
 
-🧪 Тестирование
+## 🧪 Тестирование
+
 Проект покрыт юнит-тестами (pytest). Для запуска:
-pytest tests/ -v
 
+```bash
+pytest tests/ -v
 ```
